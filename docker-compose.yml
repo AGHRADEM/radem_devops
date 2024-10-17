@@ -1,4 +1,28 @@
+volumes:
+  radem_data:
+    driver: local
+  radem_logs:
+    driver: local
+
+networks:
+  radem_network:
+    driver: bridge
+  logs_network:
+    driver: bridge
+
 services:  
+  radem_fluentd:
+    image: fluentd
+    container_name: fluentd_dev
+    ports:
+      - "24224:24224"
+    volumes:
+      - radem_logs:/tmp/logs
+      - "./fluentd/fluent.conf:/fluentd/etc/fluent.conf"
+    networks:
+      - logs_network
+    restart: unless-stopped
+
   radem_fetcher:
   # Service fetching the data.
   #  
@@ -19,6 +43,15 @@ services:
     volumes:
       - radem_data:/radem_data
     restart: unless-stopped
+    networks:
+      - logs_network
+    depends_on:
+      - radem_fluentd
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "radem_fluentd:24224"
+        tag: radem_fetcher
 
   radem_influxdb:
   # Service with the InfluxDB database.
@@ -72,11 +105,3 @@ services:
     ports:
       - "81:3000"
     restart: unless-stopped
-
-volumes:
-  radem_data:
-    driver: local
-
-networks:
-  radem_network:
-    driver: bridge
